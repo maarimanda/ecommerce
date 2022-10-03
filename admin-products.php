@@ -71,14 +71,14 @@ $app->post("/admin/products/:idproduct", function($idproduct){
 
 	$product->save();
 
-	$product->setPhoto($_FILES["file"]);
+	if($_FILES["file"]["name"] !== "") $product->setPhoto($_FILES["file"]);
 
 	header('Location: /admin/products');
 	exit;
 
 });
 
-$app->post("/admin/products/:idproduct/delete", function($idproduct){
+$app->get("/admin/products/:idproduct/delete", function($idproduct){
 
 	User::verifyLogin();
 
@@ -88,7 +88,7 @@ $app->post("/admin/products/:idproduct/delete", function($idproduct){
 
 	$product->delete();
 
-	header("Location: /admin/products");
+	header('Location: /admin/products');
 	exit;
 
 });
