@@ -11,6 +11,9 @@ class User extends Model {
 	const SESSION = "User";
 	const SECRET = "HcodePhp7_Secret";
 	const SECRET_IV = "HcodePhp7_Secret_IV";
+	const ERROR = "UserError";
+	const ERROR_REGISTER = "UserErrorRegister";
+	const SUCCESS = "UserSucesss";
 
 	public static function getFromSession()
 	{
@@ -35,15 +38,17 @@ class User extends Model {
 		) {
 			// Não está logado
 			return false;
+
 		} else {
 
-			if($inadmin === true && (bool)$_SESSION[User::SESSION]['inadmin'] === true) {
+			if( $inadmin === true && (bool)$_SESSION[User::SESSION]['inadmin'] === true ) {
 
 				return true;
 
 			} else if( $inadmin === false ) {
 
 				return true;
+
 			} else {
 
 				return false;
@@ -51,28 +56,29 @@ class User extends Model {
 		}
 	}
 
-	protected $fields = [
-		"iduser", "idperson", "deslogin", "despassword", "inadmin", "dtergister"
-	];
-
-	public static function login($login, $password):User
+	public static function login($login, $password)
 	{
 
-		$db = new Sql();
+		$sql = new Sql();
 
-		$results = $db->select("SELECT * FROM tb_users WHERE deslogin = :LOGIN", array(
+		$results = $sql->select("SELECT * FROM tb_users a INNER JOIN tb_persons b ON a.idperson = b.idperson WHERE a.deslogin = :LOGIN", array(
 			":LOGIN"=>$login
-		));
+		)); 
 
-		if (count($results) === 0) {
-			throw new \Exception("Não foi possível fazer login.");
+		if (count($results) === 0)
+		{
+			throw new \Exception("Usuário inexistente ou senha inválida.");
 		}
 
 		$data = $results[0];
 
-		if (password_verify($password, $data["despassword"])) {
+		if (password_verify($password, $data["despassword"]) === true)
+		{
 
 			$user = new User();
+
+			$data['desperson'] = utf8_encode($data['desperson']);
+
 			$user->setData($data);
 
 			$_SESSION[User::SESSION] = $user->getValues();
@@ -80,8 +86,24 @@ class User extends Model {
 			return $user;
 
 		} else {
+			throw new \Exception("Usuário inexistente ou senha inválida.");
+		}
 
-			throw new \Exception("Não foi possível fazer login.");
+	}
+
+	public static function verifyLogin($inadmin = true)
+	{
+
+		if( !User::checkLogin($inadmin) ) 
+		{
+			if( $inadmin)
+			{
+				header("Location: /admin/login");
+			} else {
+
+				header("Location: /login");
+			}
+			exit;
 
 		}
 
@@ -91,18 +113,6 @@ class User extends Model {
 	{
 
 		$_SESSION[User::SESSION] = NULL;
-
-	}
-
-	public static function verifyLogin($inadmin = true)
-	{
-
-		if( !User::checkLogin($inadmin) ) {
-			
-			header("Location: /admin/login");
-			exit;
-
-		}
 
 	}
 
@@ -121,9 +131,9 @@ class User extends Model {
 		$sql = new Sql();
 
 		$results = $sql->select("CALL sp_users_save(:desperson, :deslogin, :despassword, :desemail, :nrphone, :inadmin)", array(
-			":desperson"=>$this->getdesperson(),
+			":desperson"=>utf8_decode($this->getdesperson()),
 			":deslogin"=>$this->getdeslogin(),
-			":despassword"=>$this->getdespassword(),
+			":despassword"=>User::getPasswordHash($this->getdespassword()),
 			":desemail"=>$this->getdesemail(),
 			":nrphone"=>$this->getnrphone(),
 			":inadmin"=>$this->getinadmin()
@@ -138,9 +148,13 @@ class User extends Model {
 
 		$sql = new Sql();
 
-		$results = $sql->select("SELECT * FROM tb_users a INNER JOIN tb_persons b USING(idperson) WHERE a.iduser = :iduser;", array(
-			":iduser" => $iduser
+		$results = $sql->select("SELECT * FROM tb_users AS a INNER JOIN tb_persons AS b USING(idperson) WHERE a.iduser = :iduser", array(
+			":iduser"=>$iduser
 		));
+
+		$data = $results[0];
+
+		$data['desperson'] = utf8_encode($data['desperson']);
 
 		$this->setData($results[0]);
 
@@ -153,9 +167,9 @@ class User extends Model {
 
 		$results = $sql->select("CALL sp_usersupdate_save(:iduser, :desperson, :deslogin, :despassword, :desemail, :nrphone, :inadmin)", array(
 			":iduser"=>$this->getiduser(),
-			":desperson"=>$this->getdesperson(),
+			":desperson"=>utf8_decode($this->getdesperson()),
 			":deslogin"=>$this->getdeslogin(),
-			":despassword"=>$this->getdespassword(),
+			":despassword"=>User::getPasswordHash($this->getdespassword()),
 			":desemail"=>$this->getdesemail(),
 			":nrphone"=>$this->getnrphone(),
 			":inadmin"=>$this->getinadmin()
@@ -175,6 +189,9 @@ class User extends Model {
 		));
 	}
 
+
+	//função para recuperação de senha do usuário admin
+	//faz a comparação do email com o banco
 	public static function getForgot($email)
 	{
 
@@ -229,6 +246,7 @@ class User extends Model {
 		}
 	}
 
+	//função para validar a criptografia do code secret
 	public static function validForgotDecrypt($code)
 	{
 		$code = base64_decode($code);
@@ -283,6 +301,103 @@ class User extends Model {
 			":password"=>$password,
 			":iduser"=>$this->getiduser()
 		));
+
+	}
+
+	public static function setError($msg)
+	{
+
+		$_SESSION[User::ERROR] = $msg;
+
+	}
+
+	public static function getError()
+	{
+
+		$msg = (isset($_SESSION[User::ERROR]) && $_SESSION[User::ERROR]) ? $_SESSION[User::ERROR] : '';
+
+		User::clearError();
+
+		return $msg;
+
+	}
+
+	public static function clearError()
+	{
+
+		$_SESSION[User::ERROR] = NULL;
+
+	}
+
+	public static function setSuccess($msg)
+	{
+
+		$_SESSION[User::SUCCESS] = $msg;
+
+	}
+
+	public static function getSuccess()
+	{
+
+		$msg = (isset($_SESSION[User::SUCCESS]) && $_SESSION[User::SUCCESS]) ? $_SESSION[User::SUCCESS] : '';
+
+		User::clearSuccess();
+
+		return $msg;
+
+	}
+
+	public static function clearSuccess()
+	{
+
+		$_SESSION[User::SUCCESS] = NULL;
+
+	}
+
+	public static function setErrorRegister($msg)
+	{
+
+		$_SESSION[User::ERROR_REGISTER] = $msg;
+
+	}
+
+	public static function getErrorRegister()
+	{
+
+		$msg = (isset($_SESSION[User::ERROR_REGISTER]) && $_SESSION[User::ERROR_REGISTER]) ? $_SESSION[User::ERROR_REGISTER] : '';
+
+		User::clearErrorRegister();
+
+		return $msg;
+
+	}
+
+	public static function clearErrorRegister()
+	{
+
+		$_SESSION[User::ERROR_REGISTER] = NULL;
+
+	}
+
+	public static function checkLoginExist($login)
+	{
+
+		$sql = new Sql();
+
+		$results = $sql->select("SELECT * FROM tb_users WHERE deslogin = :deslogin", [
+			':deslogin'=>$login
+		]);
+
+		return (count($results) > 0);
+
+	}
+
+	public static function getPasswordHash($password)
+	{
+
+		return password_hash($password, PASSWORD_DEFAULT, [
+			'cost'=>12
+		]);
 
 	}
 
