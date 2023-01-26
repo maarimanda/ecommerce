@@ -39,7 +39,7 @@ class Mailer {
 		//SMTP::DEBUG_OFF = off (for production use)
 		//SMTP::DEBUG_CLIENT = client messages
 		//SMTP::DEBUG_SERVER = client and server messages
-		$this->mail->SMTPDebug = 0;
+		$this->mail->SMTPDebug = 2;
 
 		//Set the hostname of the mail server
 		$this->mail->Host = 'smtp.gmail.com';
@@ -51,6 +51,14 @@ class Mailer {
 		// - 465 for SMTP with implicit TLS, a.k.a. RFC8314 SMTPS or
 		// - 587 for SMTP+STARTTLS
 		$this->mail->Port = 587;
+
+		$this->mail->SMTPOptions = array(
+			'ssl' => array(
+				'verify_peer' => false,
+				'verify_peer_name' => false,
+				'allow_self_signed' => true
+			)
+		);
 
 		//Set the encryption mechanism to use:
 		// - SMTPS (implicit TLS on port 465) or
